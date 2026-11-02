@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, abort, make_response
 
 app = Flask(__name__)
 
@@ -8,21 +8,29 @@ def home():
 
 @app.route("/about")
 def about():
-    return "TaskFlow is a task management platform"
+    return "TaskFlow is a task management platform."
 
 @app.route("/health")
 def health():
-    return "Application is running!"
+    response = make_response({
+    "message": "Application is healthy"
+    },200)
+
+    response.headers["X-Application"] = "TaskFlow"
+
+    return response
 
 @app.route("/tasks/<int:task_id>")
 def get_task(task_id):
-    print(f"Task ID: {task_id}")
-    print(f"Type: {type(task_id)}")
 
-    return {
-        "task_id": task_id,
-        "message": "Task retrieved successfully"
-    }
+    if task_id == 101:
+        return {
+            "id": 101,
+            "title": "Learn flask",
+            "priority": "high"
+        }, 200
+
+    abort(404, description="Task doesn't exist")
 
 @app.route("/users/<string:username>")
 def get_user(username):
@@ -39,13 +47,22 @@ def get_task_by_project(project_id, task_id):
 def tasks():
 
     if request.method == "POST":
-        data = request.json
+        if not request.is_json:
+            abort(415, description="JSON is required")
+
+        data = request.get_json()
+
+        if not isinstance(data, dict):
+            abort(400, description="Expected JSON object")
 
         title = data.get("title")
-        description = data.get("description")
-        priority = data.get("priority")
 
-        return {"title": title, "description": description, "priority": priority }
+        if not isinstance(title, str) or not title.strip():
+            abort(400, description="Title must be not empty string")
+
+        priority = data.get("priority", "medium")
+
+        return {"id": 101, "title": title.strip(), "priority": priority }, 201
 
     status = request.args.get("status")
     page = request.args.get("page", default=1, type=int)
@@ -61,8 +78,11 @@ def inspect():
 
     return {"method": method, "Content-Type": content_type, "User-Agent": user_agent}
 
-
-
-
+@app.errorhandler(404)
+def not_found(error):
+    return {
+    "error": "Resource not found",
+    "status": 404
+    }, 404
 
 
