@@ -1,8 +1,46 @@
+import os
 from flask import Flask
 from routes import tasks_bp
+from config import configurations
 
-app = Flask(__name__)
-app.register_blueprint(tasks_bp, url_prefix="/api/tasks")
+def validate_production_secret():
+    production_secret = os.environ.get(
+        "PROD_SERVICE_SECRET_KEY"
+    )
+
+    if not production_secret:
+        raise RuntimeError(
+            "PROD_SERVICE_SECRET_KEY is required"
+        )
+
+
+def create_app(test_config=None):
+    app = Flask(__name__)
+
+    environment = os.environ.get("APP_ENV", "development").strip().lower()
+
+    config_class = configurations.get(environment)
+
+    if config_class is None:
+        raise RuntimeError(f"Unknown environment: {environment}")
+
+
+    app.config.from_object(config_class)
+
+    if test_config is not None:
+        app.config.update(test_config)
+
+    if environment == "production":
+        validate_production_secret()
+
+    app.register_blueprint(
+        tasks_bp,
+        url_prefix="/api/tasks"
+    )
+
+    return app
+
+
 # @app.route('/')
 # def home():
 #     return "Welcome to TaskFlow!"
